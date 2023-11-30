@@ -1,0 +1,6 @@
+(executable
+ (public_name oauth_dream)
+ (name main)
+ (libraries yojson oauth_dream dream dream-livereload dotenv cohttp-lwt-unix cohttp-lwt)
+ (preprocess
+  (pps ppx_deriving_yojson ppx_let lwt_ppx ppx_deriving.show)))

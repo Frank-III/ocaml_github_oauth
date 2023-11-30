@@ -1,0 +1,8 @@
+lib: [
+  "_build/install/default/lib/oauth_dream/META"
+  "_build/install/default/lib/oauth_dream/dune-package"
+  "_build/install/default/lib/oauth_dream/opam"
+]
+bin: [
+  "_build/install/default/bin/oauth_dream"
+]

@@ -1,0 +1,4 @@
+(lang dune 3.11)
+(name oauth_dream)
+(sections (lib .) (bin ../../bin))
+(files (lib (META dune-package opam)) (bin (oauth_dream)))
