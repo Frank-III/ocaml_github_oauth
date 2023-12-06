@@ -122,6 +122,78 @@ let handle_callback req =
     Dream.log "state: %s, cookie_state: %s" (Option.value ~default:"" state) (Option.value ~default:"" state_cookies);
     Lwt.return @@ Dream.response ~code:403 ""
 
+{
+  "choices": [
+    {
+      "delta": {
+        "role": "assistant"
+      },
+      "finish_reason": null,
+      "index": 0
+    }
+  ],
+  "created": 1677825464,
+  "id": "chatcmpl-6ptKyqKOGXZT6iQnqiXAH8adNLUzD",
+  "model": "gpt-3.5-turbo-0301",
+  "object": "chat.completion.chunk"
+}
+
+type choice = 
+  { delta: string
+  ; finish_reason: string
+  ; index: int
+  } [@@deriving show, yojson {strict = false; exn = true}]
+
+type stream_resp = 
+  { choices: choice list
+  ; created: int
+  ; id: string
+  ; model: string
+  } [@@deriving show, yojson {strict = false; exn = true}]
+
+(* seems to be unnecessary *)
+type event = 
+  { event: string
+  ; data: string
+  } [@@deriving show, yojson {strict = false; exn = true}]
+
+let process_event_output output = 
+  Lwt_io.printf "Receive data: %s " output
+
+(* not even close*)
+let rec read_source_event body = 
+  let open Lwt.Syntax in 
+  let* body_stream = Lwt_stream.get body in
+  match body_stream with
+  | Some data -> 
+    Dream.log "get data: %s" data;
+    let json = Yojson.Safe.from_string data in 
+    let event = event_of_yojson_exn json in 
+    let* _ = process_event_output event.data in
+    read_source_event body
+  | None ->
+    Lwt.return @@ Dream.response ~code:200 "Fail to get data"
+
+
+
+let random_ask_gpt req = 
+  let open Lwt.Syntax in 
+  let token = get_required_env "OPENAI_API_KEY" in
+  Dream.log "token: %s" token;
+  let* response, body = 
+    Cohttp_lwt_unix.Client.post
+      (Uri.of_string "https://api.openai.com/v1/chat/completions")
+      ~headers:(Cohttp.Header.of_list [("Authorization", Fmt.str "Bearer %s" token); ("Accept", "application/json"); ("Content-Type", "application/json")])
+      ~body: Cohttp_lwt.Body.(of_string @@ Yojson.Safe.to_string @@ 
+                                  `Assoc 
+                                  [ ("model", `String "gpt-3.5-turbo")
+                                  ; ("messages", `List [`Assoc [("role", `String "user"); ("content", `String "Hello, how are you?")]])
+                                  ; ("stream", `Bool true)])
+  in 
+  let body = Cohttp_lwt.Body.to_stream body in
+  Dream.log "get streaming body";
+  read_source_event body
+
 let () = 
   Dotenv.export() |> ignore;
   Dream.run ~port:3000 @@
@@ -131,6 +203,7 @@ let () =
       Dream.html "Good morning, world!") ;
     Dream.get "/auth/login/github" @@ handle_authorization ; 
     Dream.get "/auth/login/github/callback" @@ handle_callback ;
+    Dream.get "/gpt" @@ random_ask_gpt ;
   ]
 
 
